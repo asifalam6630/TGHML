@@ -11,7 +11,9 @@ import {
   UserAccount,
   UserRole,
   SystemAuditLog,
-  AuditActionType
+  AuditActionType,
+  JobDescription,
+  JDResolutionResult
 } from './types/organogram';
 import { 
   INITIAL_PRESETS, 
@@ -28,6 +30,10 @@ import {
   createAuditLogEntry 
 } from './data/auditLog';
 import { 
+  getStoredJDs, 
+  saveJDs 
+} from './data/jobDescriptions';
+import { 
   buildHierarchyTree, 
   willCreateCycle, 
   exportToCSV 
@@ -38,6 +44,9 @@ import { OrgCanvas } from './components/OrgCanvas';
 import { DepartmentGridView } from './components/DepartmentGridView';
 import { RosterTableView } from './components/RosterTableView';
 import { ManpowerSummaryView } from './components/ManpowerSummaryView';
+import { JDManagementDashboard } from './components/JDManagementDashboard';
+import { JDPdfViewerModal } from './components/JDPdfViewerModal';
+import { JDUploadAssignModal } from './components/JDUploadAssignModal';
 import { AdminPanelModal } from './components/AdminPanelModal';
 import { FileUploadModal } from './components/FileUploadModal';
 import { PdfViewerModal } from './components/PdfViewerModal';
@@ -58,7 +67,10 @@ import {
   HardDrive, 
   Target, 
   ShieldAlert,
-  LogOut
+  LogOut,
+  ChevronUp,
+  ChevronDown,
+  FileText
 } from 'lucide-react';
 
 const STORAGE_KEY = 'turag_custom_datasets_v3';
@@ -102,7 +114,7 @@ export default function App() {
     (
       action: AuditActionType,
       details: string,
-      entityType?: 'AUTH' | 'NODE' | 'MANPOWER' | 'USER_ACCOUNT' | 'DATASET',
+      entityType?: 'AUTH' | 'NODE' | 'MANPOWER' | 'USER_ACCOUNT' | 'DATASET' | 'JOB_DESCRIPTION',
       entityId?: string
     ) => {
       const newEntry = createAuditLogEntry({
@@ -163,8 +175,32 @@ export default function App() {
     setCollapsedIds(initialCollapsed);
   }, [currentDatasetId]);
 
-  // Active view: tree | departments | table | manpower
-  const [activeView, setActiveView] = useState<'tree' | 'departments' | 'table' | 'manpower'>('tree');
+  // Active view: tree | departments | table | manpower | jd_management
+  const [activeView, setActiveView] = useState<'tree' | 'departments' | 'table' | 'manpower' | 'jd_management'>('tree');
+
+  // Job Description (JD) Management System State
+  const [jds, setJds] = useState<JobDescription[]>(() => getStoredJDs());
+  const [isJDPdfModalOpen, setIsJDPdfModalOpen] = useState(false);
+  const [selectedJDForPdf, setSelectedJDForPdf] = useState<JobDescription | null>(null);
+  const [selectedJDPriorityInfo, setSelectedJDPriorityInfo] = useState<{
+    level: number;
+    label: string;
+    ruleDescription: string;
+    isConflict?: boolean;
+  } | undefined>(undefined);
+  const [selectedJDEmployeeContext, setSelectedJDEmployeeContext] = useState<{
+    id: string;
+    name?: string;
+    title: string;
+    department: string;
+    brand?: string;
+    reportingManagerName?: string;
+  } | undefined>(undefined);
+  const [isJDUploadModalOpen, setIsJDUploadModalOpen] = useState(false);
+  const [editingJD, setEditingJD] = useState<JobDescription | null>(null);
+
+  // Compact Corner Floating Manager Panel Toggle
+  const [isManagerPanelExpanded, setIsManagerPanelExpanded] = useState(false);
 
   // Collapsed branches state
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => {
@@ -515,6 +551,96 @@ export default function App() {
     showToast(`Loaded "${newDataset.name}" with ${newDataset.nodes.length} roles.`);
   };
 
+  // -------------------------------------------------------------
+  // JOB DESCRIPTION (JD) MANAGEMENT HANDLERS (ADMIN ONLY MUTATIONS)
+  // -------------------------------------------------------------
+  const handleSaveJD = (jd: JobDescription, isNew: boolean) => {
+    if (!isAdmin) {
+      showToast('Permission Denied: Only Administrator can upload or modify Job Descriptions.', 'error');
+      logEvent('UNAUTHORIZED_ATTEMPT', `Attempted unauthorized ${isNew ? 'creation' : 'modification'} of JD ${jd.code}`);
+      return;
+    }
+
+    setJds((prev) => {
+      let updated: JobDescription[];
+      if (isNew) {
+        updated = [jd, ...prev];
+      } else {
+        updated = prev.map((j) => (j.id === jd.id ? jd : j));
+      }
+      saveJDs(updated);
+      return updated;
+    });
+
+    logEvent(
+      isNew ? 'JD_UPLOAD' : 'JD_UPDATE',
+      `${isNew ? 'Uploaded and deployed' : 'Updated revision of'} Job Description: ${jd.code} (${jd.title}) with scope ${jd.scopeType}`,
+      'JOB_DESCRIPTION',
+      jd.id
+    );
+
+    showToast(
+      isNew ? `Job Description ${jd.code} uploaded and distributed.` : `Job Description ${jd.code} updated.`,
+      'success'
+    );
+  };
+
+  const handleDeleteJD = (jdId: string) => {
+    if (!isAdmin) {
+      showToast('Permission Denied: Only Administrator can delete Job Descriptions.', 'error');
+      return;
+    }
+
+    const target = jds.find((j) => j.id === jdId);
+    if (!target) return;
+
+    if (!confirm(`Are you sure you want to delete Job Description "${target.title}" (${target.code})?`)) {
+      return;
+    }
+
+    setJds((prev) => {
+      const updated = prev.filter((j) => j.id !== jdId);
+      saveJDs(updated);
+      return updated;
+    });
+
+    logEvent('JD_DELETE', `Deleted Job Description: ${target.code} (${target.title})`, 'JOB_DESCRIPTION', target.id);
+    showToast(`Deleted Job Description ${target.code}.`, 'success');
+  };
+
+  const handleOpenJDPdfFromDrawer = (
+    jd: JobDescription,
+    res: JDResolutionResult,
+    node: OrgNodeData
+  ) => {
+    setSelectedJDForPdf(jd);
+    setSelectedJDPriorityInfo({
+      level: res.priorityLevel,
+      label: res.priorityLabel,
+      ruleDescription: res.ruleDescription,
+      isConflict: res.isConflict,
+    });
+    setSelectedJDEmployeeContext({
+      id: node.id,
+      name: node.name,
+      title: node.title,
+      department: node.department,
+      brand: node.brand,
+      reportingManagerName: node.reportsTo ? nodes.find((n) => n.id === node.reportsTo)?.name : undefined,
+    });
+    setIsJDPdfModalOpen(true);
+    logEvent('VIEW', `Inspected assigned JD PDF (${jd.code}) for employee ${node.id} (${node.name || node.title})`, 'JOB_DESCRIPTION', jd.id);
+  };
+
+  const handleAssignJDForNode = (node: OrgNodeData) => {
+    if (!isAdmin) {
+      showToast('Permission Denied: Only Administrator can assign Job Descriptions.', 'error');
+      return;
+    }
+    setEditingJD(null);
+    setIsJDUploadModalOpen(true);
+  };
+
   // Unauthorized count for warning dot in header
   const unauthorizedCount = useMemo(() => {
     return auditLogs.filter((l) => l.action === 'UNAUTHORIZED_ATTEMPT').length;
@@ -577,121 +703,8 @@ export default function App() {
         unauthorizedAttemptsCount={unauthorizedCount}
       />
 
-      {/* Role-Specific Contextual Control Strip */}
-      <div className={`px-6 py-2 border-b flex flex-wrap items-center justify-between gap-3 text-xs shrink-0 ${
-        isAdmin 
-          ? 'bg-slate-900 text-white border-slate-800'
-          : isManager
-          ? 'bg-amber-500/10 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200'
-          : 'bg-emerald-500/10 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200'
-      }`}>
-        {/* Left: Role identity and assigned department */}
-        <div className="flex items-center gap-2">
-          {isAdmin ? (
-            <div className="flex items-center gap-1.5 font-bold">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>ADMIN CONTROL PANEL</span>
-            </div>
-          ) : isManager ? (
-            <div className="flex items-center gap-1.5 font-bold">
-              <Shield className="w-4 h-4 text-amber-600" />
-              <span>MANAGER WORKSPACE</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 font-bold">
-              <Eye className="w-4 h-4 text-emerald-600" />
-              <span>PUBLIC PREVIEW MODE</span>
-            </div>
-          )}
-          <span className="opacity-40">|</span>
-          <span className="font-medium">
-            User: <strong>{currentUser.name}</strong> ({currentUser.userId})
-          </span>
-          {currentUser.department && currentUser.department !== 'All Departments' && (
-            <span className="opacity-90">
-              · Scope: <strong>{currentUser.department} Department</strong>
-            </span>
-          )}
-        </div>
-
-        {/* Right: Quick Action Shortcuts based on assigned interface */}
-        <div className="flex items-center gap-2">
-          {isAdmin && (
-            <>
-              <button
-                type="button"
-                onClick={() => setIsAuditLogModalOpen(true)}
-                className="px-2.5 py-1 rounded bg-red-900/80 hover:bg-red-800 text-white text-[11px] font-semibold flex items-center gap-1 transition-colors"
-                title="Security & Activity Audit Log"
-              >
-                <ShieldAlert className="w-3 h-3 text-red-300" />
-                <span>Audit Logs ({auditLogs.length})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsUserLibModalOpen(true)}
-                className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-semibold flex items-center gap-1 transition-colors"
-              >
-                <Key className="w-3 h-3 text-indigo-400" />
-                <span>Password Library</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsUploadModalOpen(true)}
-                className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-semibold flex items-center gap-1 transition-colors"
-              >
-                <UploadCloud className="w-3 h-3 text-slate-300" />
-                <span>Upload PDF/Visio</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsGoogleDriveModalOpen(true)}
-                className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-semibold flex items-center gap-1 transition-colors"
-              >
-                <HardDrive className="w-3 h-3 text-emerald-400" />
-                <span>Google Drive Sync</span>
-              </button>
-            </>
-          )}
-
-          {isManager && currentUser.department && (
-            <button
-              type="button"
-              onClick={() => {
-                const target = nodes.find((n) => n.department.toLowerCase() === currentUser.department?.toLowerCase());
-                if (target) {
-                  setSelectedNode(target);
-                  setActiveView('tree');
-                }
-              }}
-              className="px-2.5 py-1 rounded bg-amber-600 text-white hover:bg-amber-700 text-[11px] font-semibold flex items-center gap-1 transition-colors shadow-2xs"
-            >
-              <Target className="w-3 h-3" />
-              <span>Focus {currentUser.department} in Tree</span>
-            </button>
-          )}
-
-          {!isAdmin && !isManager && (
-            <span className="text-[11px] opacity-80 flex items-center gap-1">
-              <span>Read-only hierarchy explorer. To edit, please login as Admin or Manager.</span>
-            </span>
-          )}
-
-          {/* Logout Action in Strip */}
-          <button
-            type="button"
-            onClick={handleSignOut}
-            className="px-2 py-0.5 rounded border border-inherit hover:bg-black/10 transition-colors text-[11px] font-semibold flex items-center gap-1 ml-1"
-            title="Logout to Login Interface"
-          >
-            <LogOut className="w-3 h-3" />
-            <span>Sign Out</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Main View Area */}
-      <main className="flex-1 w-full h-[calc(100vh-104px)] overflow-hidden relative">
+      {/* Main View Area (Maximized full canvas height with clean responsive view) */}
+      <main className="flex-1 w-full h-[calc(100vh-68px)] overflow-hidden relative">
         {/* Manpower Summary View (Visible to BOTH Admin and Public Previewers) */}
         {activeView === 'manpower' && (
           <ManpowerSummaryView
@@ -702,6 +715,43 @@ export default function App() {
               setActiveView('tree');
             }}
             isAdmin={isAdmin}
+          />
+        )}
+
+        {/* Centralized JD Management Dashboard */}
+        {activeView === 'jd_management' && (
+          <JDManagementDashboard
+            jds={jds}
+            allNodes={nodes}
+            userRole={currentUser.role}
+            onOpenUploadNew={() => {
+              if (!isAdmin) {
+                showToast('Permission Denied: Only Administrator can upload Job Descriptions.', 'error');
+                return;
+              }
+              setEditingJD(null);
+              setIsJDUploadModalOpen(true);
+            }}
+            onViewJDPdf={(jd) => {
+              setSelectedJDForPdf(jd);
+              setSelectedJDPriorityInfo(undefined);
+              setSelectedJDEmployeeContext(undefined);
+              setIsJDPdfModalOpen(true);
+              logEvent('VIEW', `Opened PDF Job Description: ${jd.code} (${jd.title})`, 'JOB_DESCRIPTION', jd.id);
+            }}
+            onEditJD={(jd) => {
+              if (!isAdmin) {
+                showToast('Permission Denied: Only Administrator can modify Job Descriptions.', 'error');
+                return;
+              }
+              setEditingJD(jd);
+              setIsJDUploadModalOpen(true);
+            }}
+            onDeleteJD={handleDeleteJD}
+            onSelectEmployeeInTree={(node) => {
+              handleSelectNode(node);
+              setActiveView('tree');
+            }}
           />
         )}
 
@@ -750,16 +800,199 @@ export default function App() {
         )}
       </main>
 
-      {/* Node Detail Drawer */}
+      {/* Compact Corner Manager & Role Quick Panel (Fixed bottom-right corner) */}
+      <div className="fixed bottom-4 right-4 z-30 transition-all select-none">
+        {!isManagerPanelExpanded ? (
+          <div className="flex items-center gap-1.5 p-1.5 pl-3 bg-slate-900/90 hover:bg-slate-900 text-white rounded-full shadow-lg border border-slate-700/80 backdrop-blur-sm text-xs font-semibold">
+            {isAdmin ? (
+              <span className="flex items-center gap-1.5 text-emerald-400">
+                <ShieldCheck className="w-4 h-4" />
+                <span>Admin Panel</span>
+              </span>
+            ) : isManager ? (
+              <span className="flex items-center gap-1.5 text-amber-400">
+                <Shield className="w-4 h-4" />
+                <span>Manager: {currentUser.department}</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-slate-300">
+                <Eye className="w-4 h-4 text-emerald-400" />
+                <span>Public View</span>
+              </span>
+            )}
+            <span className="text-slate-500">|</span>
+            <span className="text-slate-300 font-normal truncate max-w-[120px]">{currentUser.name}</span>
+            <button
+              type="button"
+              onClick={() => setIsManagerPanelExpanded(true)}
+              className="p-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 ml-1 transition-colors"
+              title="Expand Quick Control Panel"
+            >
+              <ChevronUp className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <div className="w-72 bg-slate-900 text-white rounded-xl shadow-2xl border border-slate-700 p-3.5 animate-in slide-in-from-bottom-2 duration-150 text-xs">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800 mb-2.5">
+              <div className="flex items-center gap-2">
+                {isAdmin ? (
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                ) : isManager ? (
+                  <Shield className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <Eye className="w-4 h-4 text-emerald-400" />
+                )}
+                <div>
+                  <div className="font-bold uppercase tracking-wider text-[10px] text-slate-400">
+                    {isAdmin ? 'Admin Workspace' : isManager ? 'Manager Workspace' : 'Preview Mode'}
+                  </div>
+                  <div className="font-semibold text-slate-100 truncate max-w-[160px]">
+                    {currentUser.name}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsManagerPanelExpanded(false)}
+                className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                <ChevronDown className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Context tags */}
+            {currentUser.department && currentUser.department !== 'All Departments' && (
+              <div className="text-[10px] bg-slate-800/80 px-2 py-1 rounded text-amber-300 mb-2 border border-slate-700/60 font-mono">
+                Scope: {currentUser.department} Department
+              </div>
+            )}
+
+            {/* Quick Actions List */}
+            <div className="space-y-1 mb-3">
+              {isAdmin && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUserLibModalOpen(true);
+                      setIsManagerPanelExpanded(false);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-200 flex items-center justify-between transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Key className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Password Library</span>
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-mono">{users.length} Users</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAuditLogModalOpen(true);
+                      setIsManagerPanelExpanded(false);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-200 flex items-center justify-between transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <ShieldAlert className="w-3.5 h-3.5 text-red-400" />
+                      <span>Audit Logs</span>
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-mono">{auditLogs.length}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUploadModalOpen(true);
+                      setIsManagerPanelExpanded(false);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-200 flex items-center gap-2 transition-colors"
+                  >
+                    <UploadCloud className="w-3.5 h-3.5 text-slate-300" />
+                    <span>Upload PDF / Visio</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsGoogleDriveModalOpen(true);
+                      setIsManagerPanelExpanded(false);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-200 flex items-center gap-2 transition-colors"
+                  >
+                    <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Google Drive Sync</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingJD(null);
+                      setIsJDUploadModalOpen(true);
+                      setIsManagerPanelExpanded(false);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-200 flex items-center gap-2 transition-colors"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-red-400" />
+                    <span>Upload & Assign New JD</span>
+                  </button>
+                </>
+              )}
+
+              {isManager && currentUser.department && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = nodes.find((n) => n.department.toLowerCase() === currentUser.department?.toLowerCase());
+                    if (target) {
+                      handleSelectNode(target);
+                      setActiveView('tree');
+                    }
+                    setIsManagerPanelExpanded(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded bg-amber-600/30 hover:bg-amber-600/50 text-amber-200 flex items-center gap-2 transition-colors"
+                >
+                  <Target className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Focus {currentUser.department} in Tree</span>
+                </button>
+              )}
+            </div>
+
+            {/* Sign Out Button */}
+            <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsChangePasswordModalOpen(true);
+                  setIsManagerPanelExpanded(false);
+                }}
+                className="text-[11px] text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                Change Password
+              </button>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="px-2.5 py-1 rounded bg-slate-800 hover:bg-red-900/60 text-slate-300 hover:text-white text-[11px] font-semibold flex items-center gap-1.5 transition-colors"
+              >
+                <LogOut className="w-3 h-3 text-red-400" />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Node Detail Drawer with JD Integration */}
       <NodeDetailDrawer
         node={selectedNode}
         allNodes={nodes}
+        allJDs={jds}
         userRole={currentUser.role}
         onClose={() => setSelectedNode(null)}
         onEdit={handleOpenEdit}
         onAddChild={handleOpenAddChild}
         onDelete={handleDeleteNode}
         onSelectAnotherNode={handleSelectNode}
+        onOpenJDPdf={handleOpenJDPdfFromDrawer}
+        onAssignJD={handleAssignJDForNode}
       />
 
       {/* Admin/Manager Panel Modal for Add / Edit */}
@@ -833,6 +1066,45 @@ export default function App() {
           isOpen={isPdfModalOpen}
           onClose={() => setIsPdfModalOpen(false)}
           defaultPdf={currentDataset.pdfPath}
+        />
+      )}
+
+      {/* Job Description (JD) Formal PDF Viewer Modal */}
+      <JDPdfViewerModal
+        isOpen={isJDPdfModalOpen}
+        jd={selectedJDForPdf}
+        employeeContext={selectedJDEmployeeContext}
+        priorityInfo={selectedJDPriorityInfo}
+        userRole={currentUser.role}
+        onClose={() => {
+          setIsJDPdfModalOpen(false);
+          setSelectedJDForPdf(null);
+          setSelectedJDPriorityInfo(undefined);
+          setSelectedJDEmployeeContext(undefined);
+        }}
+        onEditJD={(targetJD) => {
+          if (!isAdmin) {
+            showToast('Permission Denied: Only Admin can edit Job Descriptions.', 'error');
+            return;
+          }
+          setIsJDPdfModalOpen(false);
+          setEditingJD(targetJD);
+          setIsJDUploadModalOpen(true);
+        }}
+      />
+
+      {/* Upload & Assign Job Description Modal (ADMIN ONLY) */}
+      {isAdmin && (
+        <JDUploadAssignModal
+          isOpen={isJDUploadModalOpen}
+          onClose={() => {
+            setIsJDUploadModalOpen(false);
+            setEditingJD(null);
+          }}
+          onSaveJD={handleSaveJD}
+          existingJD={editingJD}
+          allNodes={nodes}
+          currentUser={currentUser}
         />
       )}
 

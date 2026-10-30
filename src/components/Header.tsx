@@ -29,8 +29,8 @@ interface HeaderProps {
   currentDataset: OrgDataset;
   allDatasets: OrgDataset[];
   onSelectDataset: (datasetId: string) => void;
-  activeView: 'tree' | 'departments' | 'table' | 'manpower';
-  onChangeView: (view: 'tree' | 'departments' | 'table' | 'manpower') => void;
+  activeView: 'tree' | 'departments' | 'table' | 'manpower' | 'jd_management';
+  onChangeView: (view: 'tree' | 'departments' | 'table' | 'manpower' | 'jd_management') => void;
   currentUser: UserAccount;
   onOpenLogin: () => void;
   onSignOut: () => void;
@@ -137,6 +137,21 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <GitFork className="w-3.5 h-3.5" />
           <span>Interactive Tree</span>
+        </button>
+
+        {/* Centralized JD Management Tab */}
+        <button
+          type="button"
+          onClick={() => onChangeView('jd_management')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 ${
+            activeView === 'jd_management'
+              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+              : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+          }`}
+          title="Job Description (JD) Management, 7-Tier Distribution & PDF Governance"
+        >
+          <FileText className="w-3.5 h-3.5 text-red-500" />
+          <span>JD Management</span>
         </button>
 
         <button
