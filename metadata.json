@@ -1,0 +1,8 @@
+{
+  "name": "Turag Garments And Hosiery Limited - Organogram & Manpower System",
+  "description": "Enterprise organogram, area-wise manpower structure summary, real-time reporting manager edits, user ID/password library, and Google Drive file integration for Turag Garments And Hosiery Limited.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
