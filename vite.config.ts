@@ -5,7 +5,11 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    base: '/TGHML/',
+    // Using relative base './' allows the app to load assets correctly in:
+    // 1. AI Studio (root domain: https://ais-pre-...run.app/)
+    // 2. GitHub Pages (repository subpath: https://asifalam6630.github.io/TGHML/)
+    // 3. Any custom domain or subpath without hardcoding
+    base: './',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
