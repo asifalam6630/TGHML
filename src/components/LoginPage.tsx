@@ -233,14 +233,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       </main>
 
       {/* Footer */}
-      <footer className="h-14 px-6 border-t border-white/10 bg-slate-950/60 backdrop-blur-md text-center flex items-center justify-between text-xs text-slate-400 z-10">
+      <footer className="h-14 px-6 border-t border-white/10 bg-slate-950/60 backdrop-blur-md flex items-center justify-center text-xs text-slate-400 z-10 text-center">
         <div>
           © 2026 <strong className="text-slate-300">Turag Garments And Hosiery Limited</strong> · Garments Operating System (GOS)
-        </div>
-        <div className="hidden sm:flex items-center gap-4 text-[11px] text-slate-400">
-          <span>Learning Centre / Schedule-5 Org.S</span>
-          <span>•</span>
-          <span>Approved by Board of Directors</span>
         </div>
       </footer>
     </div>
