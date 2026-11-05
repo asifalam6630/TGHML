@@ -178,6 +178,13 @@ export default function App() {
   // Active view: tree | departments | table | manpower | jd_management
   const [activeView, setActiveView] = useState<'tree' | 'departments' | 'table' | 'manpower' | 'jd_management'>('tree');
 
+  // Ensure non-admin users cannot remain on or access jd_management view
+  useEffect(() => {
+    if (activeView === 'jd_management' && !isAdmin) {
+      setActiveView('tree');
+    }
+  }, [activeView, isAdmin]);
+
   // Job Description (JD) Management System State
   const [jds, setJds] = useState<JobDescription[]>(() => getStoredJDs());
   const [isJDPdfModalOpen, setIsJDPdfModalOpen] = useState(false);
@@ -718,8 +725,8 @@ export default function App() {
           />
         )}
 
-        {/* Centralized JD Management Dashboard */}
-        {activeView === 'jd_management' && (
+        {/* Centralized JD Management Dashboard (STRICTLY ADMIN ONLY) */}
+        {activeView === 'jd_management' && isAdmin && (
           <JDManagementDashboard
             jds={jds}
             allNodes={nodes}

@@ -36,6 +36,7 @@ import {
   RotateCcw,
   Check
 } from 'lucide-react';
+import turagLogo from '../assets/images/turag_logo.png';
 
 interface JDUploadAssignModalProps {
   isOpen: boolean;
@@ -1001,9 +1002,9 @@ export const JDUploadAssignModal: React.FC<JDUploadAssignModalProps> = ({
                   <div className="flex items-center gap-3">
                     <div className="h-12 w-auto flex items-center justify-center p-1 border border-slate-200 bg-white">
                       <img 
-                        src="/assets/aistudio/image_bfec73ab.png" 
+                        src={turagLogo} 
                         alt="Turag Garments Logo" 
-                        className="h-10 w-auto object-contain"
+                        className="h-10 w-auto max-w-[140px] object-contain block"
                       />
                     </div>
                     <div>

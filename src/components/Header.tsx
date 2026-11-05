@@ -24,6 +24,7 @@ import {
   LogOut,
   BarChart3
 } from 'lucide-react';
+import turagLogo from '../assets/images/turag_logo.png';
 
 interface HeaderProps {
   currentDataset: OrgDataset;
@@ -75,11 +76,11 @@ export const Header: React.FC<HeaderProps> = ({
           className="flex items-center gap-2.5 text-slate-900 dark:text-slate-100 whitespace-nowrap group"
         >
           {/* Company Logo Image */}
-          <div className="h-8 px-2 py-0.5 bg-white rounded border border-slate-200 flex items-center justify-center shadow-2xs">
+          <div className="h-8 px-2.5 py-0.5 bg-white rounded border border-slate-200 flex items-center justify-center shadow-2xs">
             <img
-              src="/assets/aistudio/image_bfec73ab.png"
+              src={turagLogo}
               alt="TURAG Logo"
-              className="h-6 w-auto object-contain"
+              className="h-6 w-auto max-w-[110px] object-contain block"
             />
           </div>
           <div className="hidden sm:block">
@@ -139,20 +140,22 @@ export const Header: React.FC<HeaderProps> = ({
           <span>Interactive Tree</span>
         </button>
 
-        {/* Centralized JD Management Tab */}
-        <button
-          type="button"
-          onClick={() => onChangeView('jd_management')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 ${
-            activeView === 'jd_management'
-              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
-              : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-          }`}
-          title="Job Description (JD) Management, 7-Tier Distribution & PDF Governance"
-        >
-          <FileText className="w-3.5 h-3.5 text-red-500" />
-          <span>JD Management</span>
-        </button>
+        {/* Centralized JD Management Tab (STRICTLY ADMIN ONLY) */}
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => onChangeView('jd_management')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 ${
+              activeView === 'jd_management'
+                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+            }`}
+            title="Job Description (JD) Management, 7-Tier Distribution & PDF Governance (Admin Only)"
+          >
+            <FileText className="w-3.5 h-3.5 text-red-500" />
+            <span>JD Management</span>
+          </button>
+        )}
 
         <button
           type="button"

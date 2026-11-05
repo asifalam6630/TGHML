@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Search
 } from 'lucide-react';
+import turagLogo from '../assets/images/turag_logo.png';
 
 interface ManpowerSummaryViewProps {
   nodes: OrgNodeData[];
@@ -107,9 +108,9 @@ export const ManpowerSummaryView: React.FC<ManpowerSummaryViewProps> = ({
           <div className="flex items-center gap-5">
             <div className="h-14 px-3 py-1 bg-white rounded-lg border border-slate-200 flex items-center justify-center shadow-xs">
               <img
-                src="/assets/aistudio/image_bfec73ab.png"
+                src={turagLogo}
                 alt="Turag Logo"
-                className="h-10 w-auto object-contain"
+                className="h-10 w-auto max-w-[150px] object-contain block"
               />
             </div>
             <div>

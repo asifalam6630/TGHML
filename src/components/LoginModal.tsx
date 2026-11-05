@@ -18,6 +18,7 @@ import {
   Building2,
   Key
 } from 'lucide-react';
+import turagLogo from '../assets/images/turag_logo.png';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -100,9 +101,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           {/* Turag Logo */}
           <div className="inline-block bg-white px-4 py-1.5 rounded-xl border border-slate-200 shadow-xs mb-3">
             <img
-              src="/assets/aistudio/image_bfec73ab.png"
+              src={turagLogo}
               alt="Turag Garments And Hosiery Limited"
-              className="h-10 w-auto object-contain mx-auto"
+              className="h-10 w-auto max-w-[150px] object-contain mx-auto block"
             />
           </div>
 
