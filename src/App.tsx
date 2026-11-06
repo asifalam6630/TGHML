@@ -177,6 +177,8 @@ export default function App() {
 
   // Active view: tree | departments | table | manpower | jd_management
   const [activeView, setActiveView] = useState<'tree' | 'departments' | 'table' | 'manpower' | 'jd_management'>('tree');
+  // Department-wise filter for Interactive Tree
+  const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState<string>('all');
 
   // Ensure non-admin users cannot remain on or access jd_management view
   useEffect(() => {
@@ -287,6 +289,24 @@ export default function App() {
       createdDate: new Date().toISOString().split('T')[0],
     };
     handleLogin(guestUser);
+  };
+
+  // Failed login attempt handler for Audit Log
+  const handleFailedLogin = (attemptedUserId: string, reason: string) => {
+    const matched = users.find((u) => u.userId.toLowerCase() === attemptedUserId.toLowerCase());
+    const failedEntry = createAuditLogEntry({
+      userId: attemptedUserId || 'anonymous',
+      userName: matched ? matched.name : 'Unknown User',
+      userRole: matched ? matched.role : 'public_viewer',
+      action: 'UNAUTHORIZED_ATTEMPT',
+      details: `${reason} for user ID "${attemptedUserId}".`,
+      entityType: 'AUTH',
+    });
+    setAuditLogs((prev) => {
+      const updated = [failedEntry, ...prev];
+      saveAuditLogs(updated);
+      return updated;
+    });
   };
 
   // Sign out handler
@@ -660,6 +680,7 @@ export default function App() {
         users={users}
         onLogin={handleLogin}
         onGuestAccess={handleGuestAccess}
+        onFailedLogin={handleFailedLogin}
       />
     );
   }
@@ -708,6 +729,7 @@ export default function App() {
         }}
         onResetOrg={handleResetOrg}
         unauthorizedAttemptsCount={unauthorizedCount}
+        totalLogsCount={auditLogs.length}
       />
 
       {/* Main View Area (Maximized full canvas height with clean responsive view) */}
@@ -717,6 +739,7 @@ export default function App() {
           <ManpowerSummaryView
             nodes={nodes}
             onSelectDepartmentInTree={(deptName) => {
+              setSelectedDepartmentFilter(deptName);
               const target = nodes.find((n) => n.department === deptName);
               if (target) handleSelectNode(target);
               setActiveView('tree');
@@ -762,10 +785,13 @@ export default function App() {
           />
         )}
 
-        {/* Interactive Organogram Tree View */}
+        {/* Interactive Organogram Tree View with Department-wise Filter */}
         {activeView === 'tree' && (
           <OrgCanvas
             roots={roots}
+            allNodes={nodes}
+            selectedDepartment={selectedDepartmentFilter}
+            onSelectDepartment={setSelectedDepartmentFilter}
             userRole={currentUser.role}
             collapsedIds={collapsedIds}
             onToggleCollapse={handleToggleCollapse}
@@ -784,6 +810,7 @@ export default function App() {
           <DepartmentGridView
             nodes={nodes}
             onSelectDepartmentNode={(node) => {
+              setSelectedDepartmentFilter(node.department);
               handleSelectNode(node);
               setActiveView('tree');
             }}
@@ -1065,6 +1092,7 @@ export default function App() {
         onLoginSuccess={handleLogin}
         users={users}
         currentUser={currentUser}
+        onFailedLogin={handleFailedLogin}
       />
 
       {/* PDF Reference Viewer Modal (ADMIN ONLY) */}

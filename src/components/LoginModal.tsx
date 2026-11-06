@@ -26,6 +26,7 @@ interface LoginModalProps {
   onLoginSuccess: (user: UserAccount) => void;
   users: UserAccount[];
   currentUser: UserAccount;
+  onFailedLogin?: (attemptedUserId: string, reason: string) => void;
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({
@@ -34,6 +35,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   onLoginSuccess,
   users,
   currentUser,
+  onFailedLogin,
 }) => {
   const [userIdInput, setUserIdInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
@@ -54,11 +56,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
     if (!matched) {
       setErrorMsg('Invalid User ID or Password. Check credentials with System Admin.');
+      onFailedLogin?.(userIdInput.trim(), 'Failed login attempt in modal with incorrect credentials');
       return;
     }
 
     if (!matched.isActive) {
       setErrorMsg('This user account is currently suspended. Please contact HR Administration.');
+      onFailedLogin?.(userIdInput.trim(), 'Blocked login attempt in modal on suspended account');
       return;
     }
 

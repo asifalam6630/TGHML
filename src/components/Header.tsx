@@ -44,6 +44,7 @@ interface HeaderProps {
   onExportCsv: () => void;
   onResetOrg: () => void;
   unauthorizedAttemptsCount?: number;
+  totalLogsCount?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -64,6 +65,7 @@ export const Header: React.FC<HeaderProps> = ({
   onExportCsv,
   onResetOrg,
   unauthorizedAttemptsCount = 0,
+  totalLogsCount = 0,
 }) => {
   const isAdmin = currentUser.role === 'admin';
 
@@ -191,13 +193,18 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={onOpenAuditLogs}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-red-800 dark:text-red-300 bg-red-50 dark:bg-red-950/60 border border-red-300 dark:border-red-800 rounded-lg hover:bg-red-100 transition-colors whitespace-nowrap"
-            title="View Security & Operational Audit Log (Admin Only)"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-800 dark:text-red-300 bg-red-50 dark:bg-red-950/60 border border-red-300 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors whitespace-nowrap shadow-2xs cursor-pointer"
+            title="View Security & Operational Audit Log (Admin Only) - Tracking all logins, changes, and access"
           >
-            <ShieldAlert className="w-3.5 h-3.5 text-red-600" />
-            <span className="hidden sm:inline">Audit Logs</span>
+            <ShieldAlert className="w-3.5 h-3.5 text-red-600 shrink-0" />
+            <span>Audit Logs</span>
+            {totalLogsCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-red-200 dark:bg-red-900 text-red-900 dark:text-red-100">
+                {totalLogsCount}
+              </span>
+            )}
             {unauthorizedAttemptsCount > 0 && (
-              <span className="w-2 h-2 rounded-full bg-red-600 animate-ping" />
+              <span className="w-2 h-2 rounded-full bg-red-600 animate-ping shrink-0" title={`${unauthorizedAttemptsCount} blocked attempts`} />
             )}
           </button>
         )}

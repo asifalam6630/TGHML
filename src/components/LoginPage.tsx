@@ -22,12 +22,14 @@ interface LoginPageProps {
   users: UserAccount[];
   onLogin: (user: UserAccount) => void;
   onGuestAccess: () => void;
+  onFailedLogin?: (attemptedUserId: string, reason: string) => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({
   users,
   onLogin,
   onGuestAccess,
+  onFailedLogin,
 }) => {
   const [userIdInput, setUserIdInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
@@ -48,11 +50,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
     if (!matched) {
       setErrorMsg('Invalid User ID or Password. Please verify your credentials or contact System Administration.');
+      onFailedLogin?.(userIdInput.trim(), 'Failed login attempt with incorrect credentials');
       return;
     }
 
     if (!matched.isActive) {
       setErrorMsg('This user account is currently suspended. Please contact HR Administration.');
+      onFailedLogin?.(userIdInput.trim(), 'Blocked login attempt on suspended account');
       return;
     }
 
