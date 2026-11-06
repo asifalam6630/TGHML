@@ -354,7 +354,7 @@ export const OrgCanvas: React.FC<OrgCanvasProps> = ({
   });
 
   return (
-    <div className="relative w-full h-[calc(100vh-68px)] overflow-hidden bg-slate-50 dark:bg-slate-950 flex flex-col select-none">
+    <div className="relative w-full h-full overflow-hidden bg-slate-50 dark:bg-slate-950 flex flex-col select-none">
       {/* Top Floating Control Bar: Department-wise Filter, Search, Band & Tree Controls */}
       <div className="absolute top-4 left-6 right-6 z-20 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
         <div className="flex flex-wrap items-center gap-2.5 pointer-events-auto">

@@ -180,6 +180,42 @@ export default function App() {
   // Department-wise filter for Interactive Tree
   const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState<string>('all');
 
+  // Application Theme State ('light' | 'dark' | 'system')
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
+    try {
+      const saved = localStorage.getItem('turag_app_theme');
+      if (saved === 'light' || saved === 'dark' || saved === 'system') return saved;
+    } catch {}
+    return 'light'; // Clean light/white default
+  });
+
+  // Apply dark mode class to document element on theme changes
+  useEffect(() => {
+    const applyTheme = () => {
+      const isDark =
+        theme === 'dark' ||
+        (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    };
+
+    applyTheme();
+    try {
+      localStorage.setItem('turag_app_theme', theme);
+    } catch {}
+
+    if (theme === 'system') {
+      const media = window.matchMedia('(prefers-color-scheme: dark)');
+      const listener = () => applyTheme();
+      media.addEventListener('change', listener);
+      return () => media.removeEventListener('change', listener);
+    }
+  }, [theme]);
+
   // Ensure non-admin users cannot remain on or access jd_management view
   useEffect(() => {
     if (activeView === 'jd_management' && !isAdmin) {
@@ -730,10 +766,12 @@ export default function App() {
         onResetOrg={handleResetOrg}
         unauthorizedAttemptsCount={unauthorizedCount}
         totalLogsCount={auditLogs.length}
+        currentTheme={theme}
+        onSelectTheme={setTheme}
       />
 
-      {/* Main View Area (Maximized full canvas height with clean responsive view) */}
-      <main className="flex-1 w-full h-[calc(100vh-68px)] overflow-hidden relative">
+      {/* Main View Area (Adjusted for high-density header) */}
+      <main className="flex-1 w-full h-[calc(100vh-58px)] overflow-hidden relative">
         {/* Manpower Summary View (Visible to BOTH Admin and Public Previewers) */}
         {activeView === 'manpower' && (
           <ManpowerSummaryView
